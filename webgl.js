@@ -616,17 +616,41 @@ void main() {
 
 
     document.getElementById('savePngBtn')?.addEventListener('click', () => {
-        const dpr = window.devicePixelRatio || 1;
-        const width = canvas.width / dpr;
-        const height = canvas.height / dpr;
-
-        const exportCanvas = document.createElement("canvas");
-        exportCanvas.width = width;
-        exportCanvas.height = height;
-
-        const ctx = exportCanvas.getContext("2d");
-        ctx.drawImage(canvas, 0, 0, width, height);
-
+        // Сначала перерисовываем сцену, чтобы убедиться, что все актуально
+        draw();
+        
+        // Создаем временный canvas для экспорта
+        const exportCanvas = document.createElement('canvas');
+        exportCanvas.width = canvas.width;
+        exportCanvas.height = canvas.height;
+        const ctx = exportCanvas.getContext('2d');
+        
+        // 1. Рисуем фон
+        if (currentGradient === "none") {
+            ctx.fillStyle = "#2A2A2A";
+            ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+        } else {
+            let colors;
+            if (currentGradient === null) {
+                const hour = new Date(time).getUTCHours();
+                const entry = gradientMap.find(e => hour >= e.from && hour < e.to) || gradientMap[0];
+                colors = entry.gradients[0];
+            } else {
+                colors = currentGradient;
+            }
+            
+            const grad = ctx.createLinearGradient(0, 0, 0, exportCanvas.height);
+            colors.forEach((col, idx) => {
+                grad.addColorStop(idx / (colors.length - 1), col);
+            });
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+        }
+        
+        // 2. Копируем содержимое WebGL canvas
+        ctx.drawImage(canvas, 0, 0);
+        
+        // 3. Сохраняем как PNG
         exportCanvas.toBlob(blob => {
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
@@ -636,11 +660,18 @@ void main() {
             URL.revokeObjectURL(url);
         }, "image/png");
     });
+    
+    
+    
 
 
     function exportToSVG() {
         const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
         const dpr = window.devicePixelRatio || 1;
+
+        if (!positions.length) {
+            updateStarBuffer();
+        }
 
         const width = canvas.width / dpr;
         const height = canvas.height / dpr;
@@ -722,10 +753,23 @@ void main() {
         svg.appendChild(defs);
         svg.appendChild(bgRect);
 
-        updateStarBuffer();
-        updateConstellationBuffer();
+        const magSlider = document.getElementById("magLimit");
+        if (magSlider) {
+            maxMagnitude = parseFloat(magSlider.value);
+        }
 
-        const starSize = avgSize / dpr;
+
+        if (!positions.length) {
+  const magSlider = document.getElementById("magLimit");
+  if (magSlider) {
+    maxMagnitude = parseFloat(magSlider.value);
+  }
+  updateStarBuffer();
+  updateConstellationBuffer();
+}
+
+
+        const starSize = (avgSize * zoom) / dpr;
         for (let i = 0; i < pointCount; i++) {
             const nx = (positions[i * 2] - 0.5) * zoom + 0.5 + offsetX;
             const ny = (positions[i * 2 + 1] - 0.5) * zoom + 0.5 + offsetY;
@@ -742,7 +786,7 @@ void main() {
             svg.appendChild(use);
         }
 
-        const squareSize = (avgSize / 3) / dpr;
+        const squareSize = (avgSize * zoom / 3) / dpr;
         const gap = squareSize * 3;
 
         for (const { lines } of window.asterisms) {
@@ -898,7 +942,7 @@ void main() {
 
         if (!isPaused) {
             if (useRealTime) {
-                const offset = 3 * 60 * 60 * 1000; 
+                const offset = 3 * 60 * 60 * 1000;
                 time = Date.now() + offset;
             }
             else {
@@ -1011,11 +1055,11 @@ void main() {
     });
 
     const logoToggle = document.getElementById("logo-toggle");
-const logoContainer = document.getElementById("logo-container");
+    const logoContainer = document.getElementById("logo-container");
 
-logoToggle.addEventListener("click", () => {
-  logoContainer.classList.toggle("expanded");
-});
+    logoToggle.addEventListener("click", () => {
+        logoContainer.classList.toggle("expanded");
+    });
 
 });
 
