@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Star Viewer</title>
+  <link rel="icon" href="data:,">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <style>
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    .tooltip-container {
+      position: relative;
+      display: inline-block;
+    }
+
+    #tooltip {
+      position: fixed;
+      background: white;
+      color: black;
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      max-width: 240px;
+      white-space: normal;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+      z-index: 10000;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s ease;
+    }
+
+
+    @font-face {
+      font-family: 'CoFo Meteor';
+      src: url('fonts/CoFoMeteor-Regular.woff') format('woff');
+      font-weight: normal;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    @font-face {
+      font-family: 'Suisse Intl';
+      src: url('fonts/SuisseIntl-Regular.woff') format('woff');
+      font-weight: normal;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    body {
+      margin: 0;
+      background: black;
+      overflow: hidden;
+      font-family: 'Suisse Intl', sans-serif;
+    }
+
+    canvas {
+      display: block;
+      background-repeat: no-repeat;
+      background-size: cover;
+      width: 100%;
+      height: 100%;
+      image-rendering: pixelated;
+      background-size: cover !important;
+      background-position: center !important;
+    }
+
+    #canvas-container,
+    canvas {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      touch-action: none;
+      background: black;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    canvas {
+      margin: 0 auto;
+    }
+
+    #settings-container {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 250px;
+      background: rgba(0, 0, 0, 0.6);
+      border-radius: 4px;
+      transition: transform 0.3s ease;
+    }
+
+    #settings-container.closed {
+      transform: translateX(100%);
+    }
+
+    #toggle-settings {
+      position: absolute;
+      top: 8px;
+      left: -30px;
+      width: 24px;
+      height: 24px;
+      border: none;
+      background: rgba(255, 255, 255, 0.2);
+      color: #fff;
+      font-size: 14px;
+      cursor: pointer;
+      border-radius: 2px;
+    }
+
+    #ui-container {
+      position: fixed;
+      top: 50%;
+      right: 20px;
+      width: 340px;
+      transform: translateY(-50%);
+      background: #0B0B0B;
+      color: white;
+      border-radius: 10px;
+      padding: 20px;
+      z-index: 100;
+      max-height: 95vh;
+      overflow: visible;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #ui-container.collapsed {
+      width: 60px;
+      overflow: visible;
+    }
+
+    #ui-container.collapsed>*:not(.app-title) {
+      display: none;
+    }
+
+    #ui-container.collapsed .app-title {
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+      margin: 0 auto;
+    }
+
+    .ui-sections-wrapper {
+      flex: 1;
+      overflow-x: visible;
+      overflow-y: auto;
+      padding-right: 10px;
+      padding-left: 0px;
+      box-sizing: border-box;
+    }
+
+
+    .ui-sections-wrapper::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .ui-sections-wrapper::-webkit-scrollbar-thumb {
+      background: rgb(255, 255, 255);
+      border-radius: 2px;
+    }
+
+
+    .ui-section {
+      margin-bottom: 15px;
+      padding-bottom: 15px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .ui-section:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+      padding-bottom: 0;
+    }
+
+    .app-title {
+      font-family: 'CoFo Meteor', sans-serif;
+      font-size: 56px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 20px;
+      color: white;
+      line-height: 1;
+    }
+
+    .ui-section-title {
+      font-family: 'Suisse Intl', sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 12px;
+      opacity: 0.5;
+      text-transform: uppercase;
+      letter-spacing: -0.02em;
+    }
+
+    .info-grid,
+    .value-box,
+    .slider-label,
+    button:not(.gradient-btn),
+    select,
+    .toggle-button,
+    .slider-value {
+      font-size: 14px !important;
+    }
+
+    .info-grid {
+      display: grid;
+      grid-template-columns: 80px 1fr;
+      gap: 8px 10px;
+      align-items: center;
+    }
+
+    .info-label {
+      color: rgba(255, 255, 255, 1);
+    }
+
+
+    .value-box {
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 4px;
+      padding: 8px 12px;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .slider-group {
+      margin-bottom: 12px;
+    }
+
+    .slider-label {
+      opacity: 0.7;
+      margin-bottom: 6px;
+    }
+
+    .slider-container {
+      position: relative;
+      height: 30px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 4px;
+      padding: 0;
+    }
+
+    .slider-track {
+      position: relative;
+      height: 100%;
+      width: 100%;
+    }
+
+    .slider-progress {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+      width: var(--progress, 0%);
+    }
+
+    .slider-value {
+      position: absolute;
+      top: 0;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: white;
+      color: #333;
+      border-radius: 4px;
+      padding: 0 8px;
+      min-width: 30px;
+      z-index: 3;
+      pointer-events: none;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+      left: var(--value-pos, 50%);
+      transform: translateX(-50%);
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 100%;
+      background: transparent;
+      position: absolute;
+      top: 0;
+      left: 0;
+      margin: 0;
+      padding: 0;
+      cursor: pointer;
+      z-index: 4;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 0;
+      height: 0;
+      opacity: 0;
+    }
+
+    input[type="range"]:focus {
+      outline: none;
+    }
+
+    input[type="range"]::-moz-focus-outer {
+      border: 0;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    button:not(.gradient-btn) {
+      background: rgba(255, 255, 255, 0.08);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 8px 12px;
+      cursor: pointer;
+      flex: 1;
+      transition: all 0.2s;
+      font-family: 'Suisse Intl', sans-serif;
+    }
+
+    button:not(.gradient-btn):hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    button:not(.gradient-btn).active {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    select {
+      width: 100%;
+      background: rgba(255, 255, 255, 0.08);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 8px 12px;
+      font-family: 'Suisse Intl', sans-serif;
+      margin-bottom: 10px;
+    }
+
+    .toggle-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .toggle-button {
+      background: rgba(255, 255, 255, 0.08);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 8px 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .toggle-button.active {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .gradient-options {
+      margin-bottom: 12px;
+    }
+
+    .gradient-label {
+      font-size: 14px;
+      opacity: 0.7;
+      margin-bottom: 8px;
+      display: block;
+    }
+
+    .gradient-buttons {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 0;
+      padding: 0;
+    }
+
+    .gradient-btn {
+      width: 30px;
+      height: 30px;
+      min-width: 30px;
+      min-height: 30px;
+      padding: 0;
+      margin: 0;
+      border: 2px solid transparent;
+      background: none;
+      border-radius: 50%;
+      cursor: pointer;
+      position: relative;
+      transition: transform 0.2s;
+      flex-shrink: 0;
+      box-sizing: border-box;
+      overflow: hidden;
+    }
+
+    .gradient-btn .gradient-preview {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      display: block;
+    }
+
+    .gradient-btn.active {
+      border-color: white;
+    }
+
+    .gradient-btn:hover {
+      transform: scale(1.1);
+    }
+
+    @media (max-height: 700px) {
+      #ui-container {
+        padding: 15px;
+        width: 280px;
+        max-height: 85vh;
+      }
+
+      .app-title {
+        font-size: 40px;
+        margin-bottom: 15px;
+      }
+
+      .ui-section {
+        margin-bottom: 10px;
+        padding-bottom: 10px;
+      }
+
+      .slider-group {
+        margin-bottom: 8px;
+      }
+
+    }
+
+    #logo-container {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      background: white;
+      border-radius: 10px;
+      z-index: 999;
+      overflow: hidden;
+      transition:
+        width 0.4s ease,
+        height 0.4s ease,
+        padding 0.4s ease;
+
+      width: 64px;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0px;
+
+    }
+
+    #logo-container.expanded {
+      width: auto;
+      height: auto;
+      padding: 0px;
+      align-items: flex-start;
+      flex-direction: row;
+    }
+
+    .logo-layout {
+      display: flex;
+      flex-direction: row;
+      align-items: flex-start;
+      gap: 0;
+    }
+
+
+    #logo-toggle {
+      width: 64px;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    #logo-toggle img {
+      width: 40px;
+      height: 40px;
+    }
+
+    .logo-expanded {
+      display: none;
+      opacity: 0;
+      max-width: 0;
+      overflow: hidden;
+      transition:
+        opacity 0.4s ease,
+        max-width 0.4s ease,
+        max-height 0.4s ease,
+        transform 0.4s ease;
+    }
+
+
+    #logo-container.expanded .logo-expanded {
+      display: flex;
+      opacity: 1;
+      max-width: 300px;
+      margin-left: 12px;
+      padding: 12px 20px 0px 0px;
+      box-sizing: border-box;
+    }
+
+    .logo-text {
+      font-size: 14px;
+      color: #333;
+      line-height: 1.4;
+      margin-bottom: 12px;
+      word-break: break-word;
+      max-width: 260px;
+    }
+
+    .logo-icons {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+
+    .logo-icons img {
+      width: 24px;
+      height: 24px;
+      cursor: pointer;
+    }
+
+    .button-group[style*="grid-column: 2"] {
+      grid-column: 1 / -1;
+      width: 100%;
+    }
+
+    .button-group[style*="grid-column: 2"] button {
+      width: 100%;
+      margin: 0;
+    }
+
+    .tooltip-container.button-group {
+      width: 100%;
+      grid-column: 1 / -1;
+    }
+
+    .tooltip-container.button-group button {
+      width: 100%;
+      margin: 0;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="settings-container">
+    <button id="toggle-settings">▲</button>
+    <div id="canvas-container" style="position: fixed; inset: 0; z-index: 0;">
+      <canvas id="glcanvas"></canvas>
+    </div>
+
+
+    <div id="ui-container">
+      <div class="app-title">Генератор<br>созвездий</div>
+      <div class="ui-sections-wrapper">
+        <div class="ui-section">
+          <div class="ui-section-title">Инфо</div>
+          <div class="info-grid">
+            <div class="info-label">Дата</div>
+            <div id="time" class="value-box">24/05/2025, 23:09:15</div>
+
+            <div class="info-label">Координаты</div>
+            <div class="tooltip-container"
+              data-tooltip="LST (звёздное время) показывает, какие звёзды проходят меридиан именно в&nbsp;вашей широте.">
+              <div id="coords" class="value-box">Широта: 56.3°, LST: 185.0°</div>
+            </div>
+
+
+            <div class="tooltip-container"
+              data-tooltip="Количество отображаемых звёзд на&nbsp;карте, отобранных по&nbsp;звёздной величине.">
+              <div class="info-label">Звёзды</div>
+            </div>
+            <div id="visible-stars" class="value-box">1625</div>
+
+            <div class="info-label">Авто-широта</div>
+            <div class="tooltip-container" style="width: 100%; display: flex;"
+              data-tooltip="Определяет широту по&nbsp;геолокации устройства. Используется для&nbsp;расчёта положения звёзд.">
+              <button id="getLocation" style="width: 100%;">Определить</button>
+            </div>
+
+
+          </div>
+        </div>
+
+        <div class="ui-section">
+          <div class="ui-section-title">Настройки</div>
+
+          <div class="slider-label">Формат картинки</div>
+          <div class="button-group" style="grid-column: 2; margin-bottom: 12px;">
+            <button class="res-btn" data-size="1080x1080">1:1</button>
+            <button class="res-btn" data-size="1600x1200">4:3</button>
+            <button class="res-btn" data-size="1920x1080">16:9</button>
+            <button class="res-btn" data-size="1080x1920">9:16</button>
+          </div>
+
+          <div class="slider-group">
+            <div class="tooltip-container"
+              data-tooltip="Фильтрует видимые звёзды по&nbsp;яркости. Данные взяты из&nbsp;открытого каталога Hipparcos.">
+              <div class="slider-label">Звёздная величина</div>
+            </div>
+
+            <div class="slider-container">
+              <div class="slider-track">
+                <div class="slider-progress"></div>
+                <input type="range" id="magLimit" min="0" max="10" step="0.1" value="4.4">
+                <div id="magValue" class="slider-value">4.4</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="slider-group">
+            <div class="tooltip-container"
+              data-tooltip="Определяет угол обзора звёздного неба относительно горизонта. Меняет, какие созвездия видны.">
+              <div class="slider-label">Широта</div>
+            </div>
+
+            <div class="slider-container">
+              <div class="slider-track">
+                <div class="slider-progress"></div>
+                <input type="range" id="latitude" min="-90" max="90" step="1" value="0">
+                <div id="latValue" class="slider-value">0°</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="gradient-options">
+            <div class="tooltip-container"
+              data-tooltip="Выбирает стиль фона: автоматически (в&nbsp;зависимости от&nbsp;текущего времени), чёрный (без&nbsp;градиента) или&nbsp;вручную подобранный.">
+              <div class="gradient-label">Градиент фона</div>
+            </div>
+
+            <div class="gradient-buttons">
+              <!-- Авто -->
+              <button class="gradient-btn active" data-value="auto" title="Авто">
+                <div class="gradient-preview"
+                  style="background: #666; color: white; display: flex; align-items: center; justify-content: center; font-size: 14px;">
+                  A</div>
+              </button>
+
+              <!-- Без фона -->
+              <button class="gradient-btn" data-value="4-0" title="Без фона (чёрный)">
+                <div class="gradient-preview" style="background: rgb(42, 42, 42); position: relative;">
+                  <div style="
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                width: 120%;
+                height: 2px;
+                background: red;
+                transform: translate(-50%, -50%) rotate(45deg);
+              "></div>
+                </div>
+              </button>
+
+              <!-- Остальные градиенты -->
+              <button class="gradient-btn" data-value="0-0" title="1 → 2">
+                <div class="gradient-preview" style="background: linear-gradient(135deg, #CECECC, #FDE2D0, #FAB4A3);">
+                </div>
+              </button>
+              <button class="gradient-btn" data-value="1-0" title="2 → 3">
+                <div class="gradient-preview" style="background: linear-gradient(135deg, #016FDB, #F4E9ED, #ADB8DF);">
+                </div>
+              </button>
+              <button class="gradient-btn" data-value="2-0" title="3 → 4">
+                <div class="gradient-preview" style="background: linear-gradient(135deg, #294472, #7579A7, #C4B8C8);">
+                </div>
+              </button>
+              <button class="gradient-btn" data-value="3-0" title="4 → 1">
+                <div class="gradient-preview" style="background: linear-gradient(135deg, #000000, #4D5FB8, #D0D3DE);">
+                </div>
+              </button>
+            </div>
+
+
+          </div>
+        </div>
+
+        <div class="ui-section">
+          <div class="ui-section-title">Время</div>
+
+          <div class="slider-group">
+            <div class="tooltip-container"
+              data-tooltip="Ускоряет или&nbsp;замедляет виртуальное время. Мы&nbsp;рассчитываем движение звёзд по&nbsp;небу с&nbsp;учётом широты и&nbsp;звёздного восхождения.">
+              <div class="slider-label">Скорость времени</div>
+            </div>
+
+            <div class="slider-container">
+              <div class="slider-track">
+                <div class="slider-progress"></div>
+                <input type="range" id="speedSlider" min="0" max="10" step="1" value="1">
+                <div id="speedValue" class="slider-value">×1</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="toggle-group">
+            <button id="pauseBtn" class="toggle-button">Пауза</button>
+            <button id="resetTime" class="toggle-button active">Текущее время</button>
+          </div>
+        </div>
+
+
+        <div class="ui-section-title">Действия</div>
+
+        <div class="button-group" style="margin-top: 8px; flex-direction: column; gap: 0px;">
+          <button id="resetViewBtn" style="width: 100%;">Сбросить zoom</button>
+
+          <div class="button-group" style="display: flex; gap: 8px;">
+            <button id="saveSvgBtn">Скачать SVG</button>
+            <button id="savePngBtn">Скачать PNG</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>
+
+
+  <script src="constellations_asterisms.js"></script>
+  <svg id="svgExport" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1920"
+    height="1080" style="display: none;"></svg>
+
+  <script type="module" src="webgl.js"></script>
+
+  <div id="tooltip" style="display: none;"></div>
+
+  <div id="logo-container">
+    <div class="logo-layout">
+      <div id="logo-toggle">
+        <img src="icon.svg" alt="Logo">
+      </div>
+
+      <div class="logo-expanded">
+        <div class="logo-text">
+          Автор: Подборная Екатерина специально для&nbsp;диплома по&nbsp;Ребрендингу Нижегородского планетария в&nbsp;2025&nbsp;году. 
+          <br><br> 
+          Для&nbsp;любых вопросов или&nbsp;комментариев, свяжитесь со&nbsp;мной в&nbsp;социальных сетях.</br>
+          <div class="logo-icons">
+            <img src="icon2.svg" alt="Telegram" onclick="window.open('https://t.me/esli_cht0', '_blank')">
+            <img src="icon3.svg" alt="Email" onclick="window.open('mailto:ekaterina.podbornaya@yandex.ru')">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+
+</html>
