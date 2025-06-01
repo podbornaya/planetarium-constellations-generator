@@ -1087,5 +1087,3 @@ function updateSlider(slider, valueElement, progressElement, isLatitude) {
         progressElementEl.style.setProperty('--progress', percent + '%');
     }
 }
-
-
