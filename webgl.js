@@ -6,6 +6,8 @@ const starMap = new Map();
 for (const star of stars) {
     starMap.set(star.hip, star);
 }
+let exportDotPositions = [];
+
 
 const gradient1 = ['#CECECC', '#FDE2D0', '#FAB4A3'];
 const gradient2 = ['#016FDB', '#F4E9ED', '#ADB8DF'];
@@ -415,6 +417,7 @@ void main() {
     function updateConstellationBuffer() {
 
         const dpr = window.devicePixelRatio || 1;
+        exportDotPositions.length = 0;
         const heightPixels = canvas.height / dpr;
         const dotSpacingPx = 20;
         const DOT_SPACING = dotSpacingPx / heightPixels;
@@ -467,6 +470,8 @@ void main() {
 
                     seenDots.push([x, y]);
                     dotPositions.push(x, y);
+
+                    exportDotPositions.push([x, y]);
 
                 }
 
@@ -616,16 +621,16 @@ void main() {
 
 
     document.getElementById('savePngBtn')?.addEventListener('click', () => {
-        // Сначала перерисовываем сцену, чтобы убедиться, что все актуально
-        draw();
         
-        // Создаем временный canvas для экспорта
+        draw();
+
+        
         const exportCanvas = document.createElement('canvas');
         exportCanvas.width = canvas.width;
         exportCanvas.height = canvas.height;
         const ctx = exportCanvas.getContext('2d');
+
         
-        // 1. Рисуем фон
         if (currentGradient === "none") {
             ctx.fillStyle = "#2A2A2A";
             ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
@@ -638,7 +643,7 @@ void main() {
             } else {
                 colors = currentGradient;
             }
-            
+
             const grad = ctx.createLinearGradient(0, 0, 0, exportCanvas.height);
             colors.forEach((col, idx) => {
                 grad.addColorStop(idx / (colors.length - 1), col);
@@ -646,11 +651,11 @@ void main() {
             ctx.fillStyle = grad;
             ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
         }
-        
-        // 2. Копируем содержимое WebGL canvas
+
+       
         ctx.drawImage(canvas, 0, 0);
-        
-        // 3. Сохраняем как PNG
+
+       
         exportCanvas.toBlob(blob => {
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
@@ -660,195 +665,153 @@ void main() {
             URL.revokeObjectURL(url);
         }, "image/png");
     });
-    
-    
-    
+
 
 
     function exportToSVG() {
-        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-        const dpr = window.devicePixelRatio || 1;
-
+        const canvas = document.getElementById("glcanvas");
         if (!positions.length) {
+            const magSlider = document.getElementById("magLimit");
+            if (magSlider) maxMagnitude = parseFloat(magSlider.value);
             updateStarBuffer();
+            updateConstellationBuffer();
         }
 
-        const width = canvas.width / dpr;
-        const height = canvas.height / dpr;
+       
+        const width = canvas.width;
+        const height = canvas.height;
 
-        svg.setAttribute('width', width);
-        svg.setAttribute('height', height);
-        svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
-        svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-        svg.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+       
+        const svgNS = "http://www.w3.org/2000/svg";
+        const xlinkNS = "http://www.w3.org/1999/xlink";
+        const svg = document.createElementNS(svgNS, "svg");
+        svg.setAttribute("width", width.toString());
+        svg.setAttribute("height", height.toString());
+        svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+        svg.setAttribute("xmlns", svgNS);
+        svg.setAttribute("xmlns:xlink", xlinkNS);
 
-        const bgRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-        bgRect.setAttribute('width', '100%');
-        bgRect.setAttribute('height', '100%');
-
+    
+        const bgRect = document.createElementNS(svgNS, "rect");
+        bgRect.setAttribute("width", "100%");
+        bgRect.setAttribute("height", "100%");
         if (currentGradient === "none") {
-            bgRect.setAttribute('fill', '#2A2A2A');
-        } else if (!currentGradient) {
+            bgRect.setAttribute("fill", "#2A2A2A");
+        }
+        else if (!currentGradient) {
+            
             const hour = new Date(time).getUTCHours();
             const entry = gradientMap.find(e => hour >= e.from && hour < e.to) || gradientMap[0];
-            const gradientId = 'gradient_' + Date.now();
-
-            const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
-            const grad = document.createElementNS("http://www.w3.org/2000/svg", "linearGradient");
-            grad.setAttribute('id', gradientId);
-            grad.setAttribute('x1', '0%');
-            grad.setAttribute('y1', '0%');
-            grad.setAttribute('x2', '0%');
-            grad.setAttribute('y2', '100%');
-
-            entry.gradients[0].forEach((color, i) => {
-                const stop = document.createElementNS("http://www.w3.org/2000/svg", "stop");
-                stop.setAttribute('offset', `${i * 100 / (entry.gradients[0].length - 1)}%`);
-                stop.setAttribute('stop-color', color);
-                grad.appendChild(stop);
+            const colors = entry.gradients[0];
+            const gradientId = "grad_bg_" + Date.now();
+            const defs = document.createElementNS(svgNS, "defs");
+            const linearGrad = document.createElementNS(svgNS, "linearGradient");
+            linearGrad.setAttribute("id", gradientId);
+            linearGrad.setAttribute("x1", "0%");
+            linearGrad.setAttribute("y1", "0%");
+            linearGrad.setAttribute("x2", "0%");
+            linearGrad.setAttribute("y2", "100%");
+            colors.forEach((col, i) => {
+                const stop = document.createElementNS(svgNS, "stop");
+                stop.setAttribute("offset", `${i * 100 / (colors.length - 1)}%`);
+                stop.setAttribute("stop-color", col);
+                linearGrad.appendChild(stop);
             });
-
-            defs.appendChild(grad);
+            defs.appendChild(linearGrad);
             svg.appendChild(defs);
-            bgRect.setAttribute('fill', `url(#${gradientId})`);
-        } else {
-            const gradientId = 'gradient_' + Date.now();
-            const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
-            const grad = document.createElementNS("http://www.w3.org/2000/svg", "linearGradient");
-            grad.setAttribute('id', gradientId);
-            grad.setAttribute('x1', '0%');
-            grad.setAttribute('y1', '0%');
-            grad.setAttribute('x2', '0%');
-            grad.setAttribute('y2', '100%');
-
-            currentGradient.forEach((color, i) => {
-                const stop = document.createElementNS("http://www.w3.org/2000/svg", "stop");
-                stop.setAttribute('offset', `${i * 100 / (currentGradient.length - 1)}%`);
-                stop.setAttribute('stop-color', color);
-                grad.appendChild(stop);
-            });
-
-            defs.appendChild(grad);
-            svg.appendChild(defs);
-            bgRect.setAttribute('fill', `url(#${gradientId})`);
+            bgRect.setAttribute("fill", `url(#${gradientId})`);
         }
-
-        const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
-        defs.innerHTML = `
-            <clipPath id="clip0_5591_5344">
-                <rect width="64" height="64" fill="white"/>
-            </clipPath>
-        `;
-
-        const symbol = document.createElementNS("http://www.w3.org/2000/svg", "symbol");
-        symbol.setAttribute("id", "star-symbol");
-        symbol.setAttribute("viewBox", "0 0 64 64");
-        symbol.innerHTML = `
-            <g clip-path="url(#clip0_5591_5344)">
-                <path fill-rule="evenodd" clip-rule="evenodd" d="M64.0019 1.84961V62.1513H0.128906V1.84961L64.0019 1.84961ZM26.35 34.8089L14.7728 49.9923L21.0872 55.1047L32.3639 39.9196L43.789 55.1047L49.9532 49.9923L38.5264 34.6588L56.2678 28.6447L54.0121 21.1283L36.2725 26.8398V9.4008H28.6038V27.1404L10.2633 21.1283L7.85731 28.6447L26.35 34.8089Z" fill="white"/>
-            </g>
-        `;
-
-        defs.appendChild(symbol);
-        svg.appendChild(defs);
+        else {
+           
+            const gradientId = "grad_bg_" + Date.now();
+            const defs = document.createElementNS(svgNS, "defs");
+            const linearGrad = document.createElementNS(svgNS, "linearGradient");
+            linearGrad.setAttribute("id", gradientId);
+            linearGrad.setAttribute("x1", "0%");
+            linearGrad.setAttribute("y1", "0%");
+            linearGrad.setAttribute("x2", "0%");
+            linearGrad.setAttribute("y2", "100%");
+            currentGradient.forEach((col, i) => {
+                const stop = document.createElementNS(svgNS, "stop");
+                stop.setAttribute("offset", `${i * 100 / (currentGradient.length - 1)}%`);
+                stop.setAttribute("stop-color", col);
+                linearGrad.appendChild(stop);
+            });
+            defs.appendChild(linearGrad);
+            svg.appendChild(defs);
+            bgRect.setAttribute("fill", `url(#${gradientId})`);
+        }
         svg.appendChild(bgRect);
 
-        const magSlider = document.getElementById("magLimit");
-        if (magSlider) {
-            maxMagnitude = parseFloat(magSlider.value);
-        }
+       
+        const defsSym = document.createElementNS(svgNS, "defs");
+        defsSym.innerHTML = `
+      <clipPath id="clip0_star">
+        <rect width="64" height="64" fill="white"/>
+      </clipPath>
+      <symbol id="star-symbol" viewBox="0 0 64 64">
+        <g clip-path="url(#clip0_star)">
+          <path fill-rule="evenodd" clip-rule="evenodd"
+            d="M64.0019 1.84961V62.1513H0.128906V1.84961L64.0019 1.84961ZM26.35 34.8089L14.7728 49.9923L21.0872 55.1047L32.3639 39.9196L43.789 55.1047L49.9532 49.9923L38.5264 34.6588L56.2678 28.6447L54.0121 21.1283L36.2725 26.8398V9.4008H28.6038V27.1404L10.2633 21.1283L7.85731 28.6447L26.35 34.8089Z"
+            fill="white"/>
+        </g>
+      </symbol>`;
+        svg.appendChild(defsSym);
 
-
-        if (!positions.length) {
-  const magSlider = document.getElementById("magLimit");
-  if (magSlider) {
-    maxMagnitude = parseFloat(magSlider.value);
-  }
-  updateStarBuffer();
-  updateConstellationBuffer();
-}
-
-
-        const starSize = (avgSize * zoom) / dpr;
+       
+        const aspect = width / height;         
+        const starSizePx = avgSize * zoom;          
         for (let i = 0; i < pointCount; i++) {
-            const nx = (positions[i * 2] - 0.5) * zoom + 0.5 + offsetX;
-            const ny = (positions[i * 2 + 1] - 0.5) * zoom + 0.5 + offsetY;
-            if (nx < 0 || nx > 1 || ny < 0 || ny > 1) continue;
-            const x = nx * width;
-            const y = ny * height;
+            const p_x = positions[i * 2 + 0];
+            const p_y = positions[i * 2 + 1];
+            const centeredX = (p_x - 0.5) * 2;
+            const centeredY = (p_y - 0.5) * 2;
+            const scaledX = centeredX * zoom + offsetX;
+            const scaledY = centeredY * zoom + offsetY;
+            const ndcX = scaledX * 1.5;
+            const ndcY = -scaledY * aspect;
+            const x_px = (ndcX * 0.5 + 0.5) * width;
+            const y_px = (ndcY * 0.5 + 0.5) * height;
+            if (x_px < -starSizePx || x_px > width + starSizePx) continue;
+            if (y_px < -starSizePx || y_px > height + starSizePx) continue;
 
-            const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
-            use.setAttributeNS("http://www.w3.org/1999/xlink", "xlink:href", "#star-symbol");
-            use.setAttribute("x", x - starSize / 2);
-            use.setAttribute("y", y - starSize / 2);
-            use.setAttribute("width", starSize);
-            use.setAttribute("height", starSize);
+            const use = document.createElementNS(svgNS, "use");
+            use.setAttributeNS(xlinkNS, "xlink:href", "#star-symbol");
+            use.setAttribute("x", (x_px - starSizePx / 2).toString());
+            use.setAttribute("y", (y_px - starSizePx / 2).toString());
+            use.setAttribute("width", starSizePx.toString());
+            use.setAttribute("height", starSizePx.toString());
             svg.appendChild(use);
         }
 
-        const squareSize = (avgSize * zoom / 3) / dpr;
-        const gap = squareSize * 3;
+       
+        const squareSizePx = (avgSize / 3) * zoom;  
 
-        for (const { lines } of window.asterisms) {
-            for (const [hip1, hip2] of lines) {
-                const star1 = starMap.get(hip1);
-                const star2 = starMap.get(hip2);
-                if (!star1 || !star2) continue;
+        for (const [nx, ny] of exportDotPositions) {
+            const centeredX = (nx - 0.5) * 2;
+            const centeredY = (ny - 0.5) * 2;
+            const scaledX = centeredX * zoom + offsetX;
+            const scaledY = centeredY * zoom + offsetY;
+            const ndcX = scaledX * 1.5;
+            const ndcY = -scaledY * aspect;
+            const x_px = (ndcX * 0.5 + 0.5) * width;
+            const y_px = (ndcY * 0.5 + 0.5) * height;
+            if (x_px < -squareSizePx || x_px > width + squareSizePx) continue;
+            if (y_px < -squareSizePx || y_px > height + squareSizePx) continue;
 
-                if (!isLineShort3D(star1, star2)) continue;
-
-                let p1 = project(star1.ra, star1.dec);
-                let p2 = project(star2.ra, star2.dec);
-                if (!p1 || !p2) continue;
-                if (!Number.isFinite(p1[0]) || !Number.isFinite(p1[1]) || !Number.isFinite(p2[0]) || !Number.isFinite(p2[1])) continue;
-
-                const screenDist = Math.hypot(p2[0] - p1[0], p2[1] - p1[1]);
-                if (screenDist > 0.5) continue;
-
-                p1 = [
-                    (p1[0] - 0.5) * zoom + 0.5 + offsetX,
-                    (p1[1] - 0.5) * zoom + 0.5 + offsetY
-                ];
-                p2 = [
-                    (p2[0] - 0.5) * zoom + 0.5 + offsetX,
-                    (p2[1] - 0.5) * zoom + 0.5 + offsetY
-                ];
-
-                const x1 = p1[0] * width;
-                const y1 = p1[1] * height;
-                const x2 = p2[0] * width;
-                const y2 = p2[1] * height;
-
-                const dx = x2 - x1;
-                const dy = y2 - y1;
-                const length = Math.sqrt(dx * dx + dy * dy);
-                const steps = length / (squareSize + gap);
-
-                for (let i = 0; i <= steps; i++) {
-                    const t = i / steps;
-                    if (t < 0.1 || t > 0.9) continue;
-
-                    const x = x1 + dx * t;
-                    const y = y1 + dy * t;
-
-                    if (x < 0 || x > width || y < 0 || y > height) continue;
-
-
-                    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-                    rect.setAttribute('x', x - squareSize / 2);
-                    rect.setAttribute('y', y - squareSize / 2);
-                    rect.setAttribute('width', squareSize);
-                    rect.setAttribute('height', squareSize);
-                    rect.setAttribute('fill', 'white');
-                    svg.appendChild(rect);
-                }
-            }
+            const rect = document.createElementNS(svgNS, "rect");
+            rect.setAttribute("x", (x_px - squareSizePx / 2).toString());
+            rect.setAttribute("y", (y_px - squareSizePx / 2).toString());
+            rect.setAttribute("width", squareSizePx.toString());
+            rect.setAttribute("height", squareSizePx.toString());
+            rect.setAttribute("fill", "white");
+            svg.appendChild(rect);
         }
 
+        
         const serializer = new XMLSerializer();
         let svgStr = serializer.serializeToString(svg);
         svgStr = '<?xml version="1.0" standalone="no"?>\n' + svgStr;
-
         const blob = new Blob([svgStr], { type: "image/svg+xml" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
@@ -859,6 +822,12 @@ void main() {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
     }
+
+   
+    document.getElementById('saveSvgBtn')?.addEventListener('click', exportToSVG);
+
+
+
 
     document.getElementById('saveSvgBtn')?.addEventListener('click', exportToSVG);
 
@@ -1087,3 +1056,5 @@ function updateSlider(slider, valueElement, progressElement, isLatitude) {
         progressElementEl.style.setProperty('--progress', percent + '%');
     }
 }
+
+
